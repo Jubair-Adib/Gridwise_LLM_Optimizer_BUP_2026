@@ -49,6 +49,20 @@ Run the public sample cases against the running service:
 python3 tests/test_public_samples.py
 ```
 
+## Interactive API Docs
+
+FastAPI auto-generates a live, browsable interface — open either of these in a browser while the service is running:
+
+- `http://localhost:8000/docs` — Swagger UI; click "Try it out" on `POST /optimize-energy`, paste in a sample request body, and execute it directly from the browser.
+- `http://localhost:8000/redoc` — read-only reference view of the same schema.
+
+The bare root `http://localhost:8000/` also serves a small landing page confirming the service is up and linking to `/health` — it is not itself a judged endpoint.
+
+## Debugging & Reports
+
+- `python3 tests/debug_interpretation.py [CASE_ID ...]` — calls the LLM interpreter directly (no HTTP) for one or more public sample cases and prints the extracted directive side by side with the expected reference directive, flagging any mismatch. Useful for tuning the prompt or comparing models.
+- `python3 tests/generate_html_report.py` — runs all public sample cases against the live service and writes a colored HTML report (`tests/report.html`) summarizing health, pass/fail, cost, and cost delta versus the reference optimum, then opens it in the default browser.
+
 ## Environment Variables
 
 | Variable | Required | Meaning |
@@ -128,7 +142,6 @@ FastAPI, Uvicorn, Pydantic, Google Gen AI SDK, SciPy, NumPy, httpx, python-doten
 - LLM interpretation failures (timeouts, provider errors, malformed output) fall back to treating all notes as `no_op` for that request rather than blocking the response, so the service always returns a valid schedule.
 - The regularization term in the objective is small enough to never change the reported optimal cost, but it does select a specific tie-broken schedule among equally optimal ones.
 - Gemini's free tier (via Google AI Studio) has requests-per-minute and requests-per-day limits that vary by model. Under the 4-hour judging window with repeated hidden-test traffic, transient `429` rate-limit errors are possible; the interpreter treats any provider error as a safe `no_op` fallback rather than failing the request, but this does cost interpretation credit for that case, so check your quota on https://aistudio.google.com before the round and consider `gemini-2.0-flash-lite` (higher free-tier throughput) or a second key as backup if traffic looks tight.
+- The Gemini client is configured with a 20-second network timeout so a stalled connection (e.g. a firewall or restrictive network silently dropping outbound packets to `generativelanguage.googleapis.com` instead of rejecting them) fails fast into the `no_op` fallback path rather than hanging the request indefinitely.
 
-## Secret Handling
 
-No API keys or secrets are committed to this repository. `.env` is git-ignored. The Docker image reads `ANTHROPIC_API_KEY` from the runtime environment only.
